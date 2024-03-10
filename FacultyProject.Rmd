@@ -1,0 +1,268 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+library(tidyverse)
+library(infer)
+```
+
+
+```{r}
+setwd("~/AppliedStatsII/Unit1/Faculty Project 1")
+```
+
+```{r}
+Faculty = read.csv("faculty.csv")
+Faculty
+
+Faculty %>%
+  group_by(Dept == "Statistics") %>%
+  summarise(
+    n = n()
+  )
+```
+
+
+```{r}
+#Faceted boxplot showing salary grouped by age
+Faculty %>% ggplot(aes(x = Gender, y = Salary)) +geom_boxplot()
+
+# boxplots showing salaries of different Titles
+Faculty %>% ggplot(aes(x = Salary, y = Title)) +geom_boxplot()
+
+#Shows salaries not grouped by gender
+Faculty %>% ggplot(aes(x = Salary)) + geom_histogram() + facet_wrap(~Dept)
+
+#Bar plot showing amount of male and female professors
+Faculty %>% ggplot(aes(x = Gender)) + geom_bar()
+
+Faculty %>%
+  group_by(Gender,Title) %>%
+  summarise(
+    mean = mean(Salary),
+    median = median(Salary),
+    sd = sd(Salary)
+  )
+
+#Bar plot if different positions
+Faculty %>% ggplot(aes(y = Title2)) + geom_bar() + facet_wrap(~Gender)
+
+
+#Barplot of different departments
+Faculty %>% ggplot(aes(y = Dept)) + geom_bar() + facet_wrap(~Gender)
+
+#Boxplot of salaries by Title2
+Faculty %>% ggplot(aes(x = Title2, y = Salary)) + geom_boxplot() + facet_wrap(~Gender)
+
+#Barplott of different departments, group english departments into one
+deparmentGender = Faculty %>% mutate(Dept2 = ifelse(Dept == "Statistics", "Statistics", "English")) %>%
+  ggplot(aes(x= Dept2)) + geom_bar() + facet_wrap(~Gender)
+#save plot
+deparmentGender
+ggsave("deparmentGender.png", deparmentGender)
+
+```
+Null Hypothesis: There is no gender paygap for full professors
+Alternate Hypothesis: There is a gender paygap for full professors
+
+```{r}
+set.seed(1492)
+FullSimulation = Faculty %>%
+  filter(Title2 == "Full") %>%
+  specify(Salary ~ Gender) %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "diff in means", order = c("Male","Female"))
+
+Faculty %>% 
+  filter(Title2 == "Full") %>%
+  group_by(Gender) %>%
+  summarise(
+   mean(Salary) 
+  )
+FullSimulation %>%
+  get_p_value(obs_stat = 122598.3-107705.9, direction = "two.sided")
+
+
+```
+
+With a p-value of 0.418. We fail to reject the null hypothesis. There is no evidence that there is a difference in pay between Male and Female Full Professors at this institution. 
+
+
+
+Null Hypothesis: There is no gender paygap for associate professors
+Alternate Hypothesis: There is a gender paygap for associate professors
+
+```{r}
+set.seed(1492)
+AssociateSimulation = Faculty %>%
+  filter(Title2 == "Associate") %>%
+  specify(Salary ~ Gender) %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "diff in means", order = c("Male","Female"))
+
+Faculty %>% 
+  filter(Title2 == "Associate") %>%
+  group_by(Gender) %>%
+  summarise(
+    mean(Salary)
+  )
+AssociateSimulation %>%
+  get_p_value(obs_stat = 91750.17-86035.86, direction = "two.sided")
+
+
+
+
+```
+```{r}
+
+facultyTermAssistant <- Faculty %>% filter(Title2 =="Assistant") %>%
+  specify(Salary~Gender) %>%
+  hypothesise(null = "independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate("diff in means", order = c("Female", "Male"))
+
+Faculty %>% filter(Title2 =="Assistant") %>%
+  group_by(Gender) %>%
+  summarize(
+    mean(Salary)
+    )
+            
+obsstatAssistant =  81395.5 - 75114.0
+
+facultyTermAssistant %>% get_p_value(obsstatAssistant, direction = "two-sided")
+```
+
+
+```{r}
+SimulateAll = Faculty %>% 
+  specify(Salary~Gender) %>%
+  hypothesise(null = "independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate("diff in means", order = c("Female", "Male"))
+
+Faculty %>%
+  group_by(Gender) %>%
+  summarize(
+    mean(Salary)
+  )
+SimulateAll %>%
+  get_p_value(obs_stat = 89238.21-102493.32, direction = "two.sided")
+```
+
+```{r}
+simulatedepartment= Faculty %>% 
+  filter(Dept == "English Lit", Title2 == "Associate") %>%
+  specify(Salary~Gender) %>%
+  hypothesise(null = "independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate("diff in means", order = c("Female", "Male")) 
+              
+Faculty %>%
+  filter(Dept == "Statistics", Title2 == "Associate") %>%
+  group_by(Gender) %>%
+  summarize(
+    mean(Salary)
+  )
+
+simulatedepartment %>%
+  get_p_value(obs_stat =  103184.20-94170.71, direction = "two.sided")
+
+
+```
+
+
+```{r}
+#simulated departments
+#split deparments into 2
+simulatedDeparments = Faculty %>% mutate(Dept2 = ifelse(Dept == "Statistics", "Statistics", "English")) 
+
+simulation = simulatedDeparments %>%
+  specify(Dept2 ~ Gender, success = "Statistics") %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "diff in props", order = c("Male", "Female"))
+
+
+simulatedDeparments %>%
+  group_by(Dept2, Gender) %>%
+  summarise(
+    count = n()
+  )
+
+simulation %>%
+  get_p_value(obs_stat = 27-11, direction = "two.sided")
+
+
+#Evidence that there is a significant difference in gender in the stats dept. Confounding variable is not knowing applicant pool. 
+
+simulationEnglish = simulatedDeparments %>%
+  specify(Dept2 ~ Gender, success = "English") %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "diff in props", order = c("Male", "Female"))
+simulatedDeparments %>%
+  group_by(Dept2, Gender) %>%
+  summarise(
+    count = n()
+  )
+
+simulationEnglish %>%
+  get_p_value(obs_stat = 17-17, direction = "two.sided")
+
+#No evidence of a significant difference in the English departments. 
+```
+
+```{r}
+FullProfessors = Faculty %>% filter(Title2 == "Full") %>% 
+  mutate(Gender2 = case_when(Gender == "Male" ~ 0, Gender == "Female" ~ 1))
+
+FullProfessors %>%
+  specify(response = Gender2) %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "diff in props", order = c(1, 0)) 
+
+
+Faculty %>% 
+  group_by(Title2, Gender) %>%
+  summarise(
+    count = n(),
+    mean = mean(Salary),
+    sd = sd(Salary),
+    median = median(Salary),
+    min = min(Salary),
+    max = max(Salary),
+    IQR = IQR(Salary))
+    
+
+```
+```{r}
+full_professors <- subset(Faculty, Title2 == "Full")
+contingency_table_full <- table(full_professors$Gender, full_professors$Title2)
+chi_squared_test_full <- chisq.test(contingency_table_full)
+chi_squared_test_full
+
+associate_professors <- subset(Faculty, Title2 == "Associate")
+contingency_table_associate <- table(associate_professors$Gender, associate_professors$Title2)
+chi_squared_test_associate <- chisq.test(contingency_table_associate)
+chi_squared_test_associate
+
+assistant_professors <- subset(Faculty, Title2 == "Assistant")
+contingency_table_assistant <- table(assistant_professors$Gender, assistant_professors$Title2)
+chi_squared_test_assistant <- chisq.test(contingency_table_assistant)
+chi_squared_test_assistant
+
+
+
+
+
+```
+
